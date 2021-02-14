@@ -38,19 +38,19 @@ namespace kcp2k
         public uint ReceiveWindowSize;
 
         // state
-        Socket socket;
+        protected Socket socket;
 #if UNITY_SWITCH
         // switch does not support ipv6
-        EndPoint newClientEP = new IPEndPoint(IPAddress.Any, 0);
+        protected EndPoint newClientEP = new IPEndPoint(IPAddress.Any, 0);
 #else
-        EndPoint newClientEP = new IPEndPoint(IPAddress.IPv6Any, 0);
+        protected EndPoint newClientEP = new IPEndPoint(IPAddress.IPv6Any, 0);
 #endif
         // IMPORTANT: raw receive buffer always needs to be of 'MTU' size, even
         //            if MaxMessageSize is larger. kcp always sends in MTU
         //            segments and having a buffer smaller than MTU would
         //            silently drop excess data.
         //            => we need the mtu to fit channel + message!
-        readonly byte[] rawReceiveBuffer = new byte[Kcp.MTU_DEF];
+        protected readonly byte[] rawReceiveBuffer = new byte[Kcp.MTU_DEF];
 
         // connections <connectionId, connection> where connectionId is EndPoint.GetHashCode
         public Dictionary<int, KcpServerConnection> connections = new Dictionary<int, KcpServerConnection>();

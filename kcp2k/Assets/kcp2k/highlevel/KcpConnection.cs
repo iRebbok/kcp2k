@@ -11,10 +11,10 @@ namespace kcp2k
     {
         protected Socket socket;
         protected EndPoint remoteEndpoint;
-        internal Kcp kcp;
+        protected internal Kcp kcp;
 
         // kcp can have several different states, let's use a state machine
-        KcpState state = KcpState.Disconnected;
+        protected KcpState state = KcpState.Disconnected;
 
         public Action OnAuthenticated;
         public Action<ArraySegment<byte>> OnData;
@@ -24,17 +24,17 @@ namespace kcp2k
         // immediately after a scene change message. Mirror can't process any
         // other messages during a scene change.
         // (could be useful for others too)
-        bool paused;
+        protected bool paused;
 
         // If we don't receive anything these many milliseconds
         // then consider us disconnected
         public const int TIMEOUT = 10000;
-        uint lastReceiveTime;
+        protected uint lastReceiveTime;
 
         // internal time.
         // StopWatch offers ElapsedMilliSeconds and should be more precise than
         // Unity's time.deltaTime over long periods.
-        readonly Stopwatch refTime = new Stopwatch();
+        protected readonly Stopwatch refTime = new Stopwatch();
 
         // we need to subtract the channel byte from every MaxMessageSize
         // calculation.
@@ -70,23 +70,23 @@ namespace kcp2k
         // buffer to receive kcp's processed messages (avoids allocations).
         // IMPORTANT: this is for KCP messages. so it needs to be of size:
         //            1 byte header + MaxMessageSize content
-        byte[] kcpMessageBuffer = new byte[1 + ReliableMaxMessageSize];
+        protected byte[] kcpMessageBuffer = new byte[1 + ReliableMaxMessageSize];
 
         // send buffer for handing user messages to kcp for processing.
         // (avoids allocations).
         // IMPORTANT: needs to be of size:
         //            1 byte header + MaxMessageSize content
-        byte[] kcpSendBuffer = new byte[1 + ReliableMaxMessageSize];
+        protected byte[] kcpSendBuffer = new byte[1 + ReliableMaxMessageSize];
 
         // raw send buffer is exactly MTU.
-        byte[] rawSendBuffer = new byte[Kcp.MTU_DEF];
+        protected byte[] rawSendBuffer = new byte[Kcp.MTU_DEF];
 
         // send a ping occasionally so we don't time out on the other end.
         // for example, creating a character in an MMO could easily take a
         // minute of no data being sent. which doesn't mean we want to time out.
         // same goes for slow paced card games etc.
         public const int PING_INTERVAL = 1000;
-        uint lastPingTime;
+        protected uint lastPingTime;
 
         // if we send more than kcp can handle, we will get ever growing
         // send/recv buffers and queues and minutes of latency.
@@ -98,7 +98,7 @@ namespace kcp2k
         // => 10k seems safe.
         //
         // note: we have a ChokeConnectionAutoDisconnects test for this too!
-        internal const int QueueDisconnectThreshold = 10000;
+        protected internal const int QueueDisconnectThreshold = 10000;
 
         // getters for queue and buffer counts, used for debug info
         public int SendQueueCount => kcp.snd_queue.Count;
@@ -146,7 +146,7 @@ namespace kcp2k
             Tick();
         }
 
-        void HandleTimeout(uint time)
+        protected void HandleTimeout(uint time)
         {
             // note: we are also sending a ping regularly, so timeout should
             //       only ever happen if the connection is truly gone.
@@ -157,7 +157,7 @@ namespace kcp2k
             }
         }
 
-        void HandleDeadLink()
+        protected void HandleDeadLink()
         {
             // kcp has 'dead_link' detection. might as well use it.
             if (kcp.state == -1)
@@ -168,7 +168,7 @@ namespace kcp2k
         }
 
         // send a ping occasionally in order to not time out on the other end.
-        void HandlePing(uint time)
+        protected void HandlePing(uint time)
         {
             // enough time elapsed since last ping?
             if (time >= lastPingTime + PING_INTERVAL)
@@ -180,7 +180,7 @@ namespace kcp2k
             }
         }
 
-        void HandleChoked()
+        protected void HandleChoked()
         {
             // disconnect connections that can't process the load.
             // see QueueSizeDisconnect comments.
@@ -206,7 +206,7 @@ namespace kcp2k
 
         // reads the next reliable message type & content from kcp.
         // -> to avoid buffering, unreliable messages call OnData directly.
-        bool ReceiveNextReliable(out KcpHeader header, out ArraySegment<byte> message)
+        protected bool ReceiveNextReliable(out KcpHeader header, out ArraySegment<byte> message)
         {
             int msgSize = kcp.PeekSize();
             if (msgSize > 0)
@@ -245,7 +245,7 @@ namespace kcp2k
             return false;
         }
 
-        void TickConnected(uint time)
+        protected void TickConnected(uint time)
         {
             // detect common events & ping
             HandleTimeout(time);
@@ -287,7 +287,7 @@ namespace kcp2k
             }
         }
 
-        void TickAuthenticated(uint time)
+        protected void TickAuthenticated(uint time)
         {
             // detect common events & ping
             HandleTimeout(time);
@@ -483,7 +483,7 @@ namespace kcp2k
         protected abstract void RawSend(byte[] data, int length);
 
         // raw send called by kcp
-        void RawSendReliable(byte[] data, int length)
+        protected void RawSendReliable(byte[] data, int length)
         {
             // copy channel header, data into raw send buffer, then send
             rawSendBuffer[0] = (byte)KcpChannel.Reliable;
@@ -491,7 +491,7 @@ namespace kcp2k
             RawSend(rawSendBuffer, length + 1);
         }
 
-        void SendReliable(KcpHeader header, ArraySegment<byte> content)
+        protected void SendReliable(KcpHeader header, ArraySegment<byte> content)
         {
             // 1 byte header + content needs to fit into send buffer
             if (1 + content.Count <= kcpSendBuffer.Length) // TODO
@@ -512,7 +512,7 @@ namespace kcp2k
             else Log.Error($"Failed to send reliable message of size {content.Count} because it's larger than ReliableMaxMessageSize={ReliableMaxMessageSize}");
         }
 
-        void SendUnreliable(ArraySegment<byte> message)
+        protected void SendUnreliable(ArraySegment<byte> message)
         {
             // message size needs to be <= unreliable max size
             if (message.Count <= UnreliableMaxMessageSize)
@@ -564,10 +564,10 @@ namespace kcp2k
 
         // ping goes through kcp to keep it from timing out, so it goes over the
         // reliable channel.
-        void SendPing() => SendReliable(KcpHeader.Ping, default);
+        protected void SendPing() => SendReliable(KcpHeader.Ping, default);
 
         // disconnect info needs to be delivered, so it goes over reliable
-        void SendDisconnect() => SendReliable(KcpHeader.Disconnect, default);
+        protected void SendDisconnect() => SendReliable(KcpHeader.Disconnect, default);
 
         protected virtual void Dispose() {}
 
