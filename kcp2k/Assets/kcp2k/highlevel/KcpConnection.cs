@@ -241,6 +241,8 @@ namespace kcp2k
                 }
             }
 
+            // output empty message result
+            message = new ArraySegment<byte>(Array.Empty<byte>(), 0, 0);
             header = KcpHeader.Disconnect;
             return false;
         }
